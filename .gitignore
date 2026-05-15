@@ -1,0 +1,94 @@
+# ============================================================
+# Trombl Backend — .gitignore
+# ============================================================
+
+# ─── SECRETS & ENVIRONMENT ────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+.env.*.local
+*.secret
+secrets.json
+service-account*.json
+*credentials*.json
+*-key.json
+
+# ─── NODE / NPM ──────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/cache
+.yarn/unplugged
+.pnp.*
+dist/
+build/
+out/
+
+# ─── DENO ────────────────────────────────────────────────
+.deno/
+
+# ─── SUPABASE LOCAL DEV ──────────────────────────────────
+# Local Supabase stack artifacts (docker-compose volumes, CLI state)
+.supabase/
+supabase/.temp/
+supabase/.branches/
+# Supabase local DB data
+**/supabase/.snapshots/
+
+# ─── DART / FLUTTER ──────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_export_environment.sh
+*.iml
+*.lock
+*.snap
+pubspec.lock
+
+# ─── PYTHON ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+.Python
+venv/
+.venv/
+env/
+
+# ─── LOGS ────────────────────────────────────────────────
+*.log
+logs/
+coverage/
+.nyc_output/
+
+# ─── GENERATED ───────────────────────────────────────────
+supabase/types/generated.ts
+*.generated.ts
+*.generated.sql
+
+# ─── EDITOR & OS ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.vscode/*.code-workspace
+*.swp
+*.swo
+*~
+.idea/
+
+# ─── CI / CD ─────────────────────────────────────────────
+.github/secrets/
+
+# ─── TEST ARTIFACTS ──────────────────────────────────────
+coverage/
+*.lcov
+junit.xml
+test-results/
