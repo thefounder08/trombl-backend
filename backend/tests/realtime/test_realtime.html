@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<!--
+  Trombl Realtime WebSocket Test
+  Open this file in a browser to test Supabase Realtime subscriptions.
+
+  Setup:
+    1. Open browser console
+    2. Fill in CONFIG below with your values from backend/.env.local
+    3. Open the file and watch the console for events
+
+  Or use the UI buttons to subscribe/unsubscribe channels.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Trombl Realtime Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #111; color: #0f0; }
+    h2 { color: #0af; }
+    button { margin: 4px; padding: 6px 14px; background: #333; color: #0f0; border: 1px solid #0f0; cursor: pointer; }
+    button:hover { background: #0f0; color: #111; }
+    #log { height: 400px; overflow-y: auto; border: 1px solid #0f0; padding: 10px; background: #000; }
+    .event { color: #ff0; } .error { color: #f00; } .info { color: #0af; } .ok { color: #0f0; }
+    input { background: #222; color: #0f0; border: 1px solid #555; padding: 4px; width: 600px; }
+  </style>
+</head>
+<body>
+<h2>Trombl Realtime Test Console</h2>
+
+<div>
+  <label>Supabase URL: <input id="url" placeholder="https://your-project-id.supabase.co"></label><br><br>
+  <label>Anon Key: <input id="anon" placeholder="paste SUPABASE_ANON_KEY here"></label><br><br>
+  <label>JWT Token: <input id="jwt" placeholder="paste TOK_ALICE or TOK_BOB here (from mint_jwt.py --export)"></label><br><br>
+  <button onclick="connect()">Connect</button>
+  <button onclick="disconnectAll()">Disconnect All</button>
+</div>
+
+<br>
+<div>
+  <strong>Subscribe channels:</strong><br>
+  <button onclick="subPresence()">drift_presence</button>
+  <button onclick="subSessions()">drift_sessions</button>
+  <button onclick="subMatches()">drift_matches (Alice-Bob)</button>
+  <button onclick="subContactExchange()">drift_contact_exchange (Alice-Bob)</button>
+  <button onclick="subStories()">drift_stories</button>
+  <button onclick="subNotifications()">trombl_notifications (self)</button>
+</div>
+
+<br>
+<div>
+  <strong>Trigger events:</strong><br>
+  <button onclick="heartbeat()">Send Presence Heartbeat</button>
+  <button onclick="revertStoryReaction()">Toggle Story Reaction</button>
+</div>
+
+<br>
+<div id="log"></div>
+
+<script>
+const ALICE_ID = 'aaaaaaaa-0001-4000-a000-000000000001';
+const BOB_ID   = 'aaaaaaaa-0002-4000-a000-000000000002';
+const ALICE_BOB_MATCH = 'a2000001-0000-4000-a000-000000000001';
+const ALICE_BOB_EXCHANGE = 'a3000001-0000-4000-a000-000000000001';
+const ALICE_STORY = 'a4000001-0000-4000-a000-000000000001';
+
+let client = null;
+const channels = [];
+let reactionToggle = false;
+
+function log(msg, cls = '') {
+  const div = document.getElementById('log');
+  const ts = new Date().toLocaleTimeString();
+  div.innerHTML += `<div class="${cls}">[${ts}] ${msg}</div>`;
+  div.scrollTop = div.scrollHeight;
+}
+
+function connect() {
+  const url = document.getElementById('url').value.trim();
+  const anon = document.getElementById('anon').value.trim();
+  const jwt  = document.getElementById('jwt').value.trim();
+  if (!url || !anon) { log('ERROR: URL and Anon key required', 'error'); return; }
+  client = supabase.createClient(url, anon, {
+    global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
+    realtime: { params: { apikey: anon } }
+  });
+  log('Connected to Supabase. Subscribe to channels below.', 'ok');
+}
+
+function subPresence() {
+  if (!client) { log('Connect first', 'error'); return; }
+  const ch = client
+    .channel('presence-test')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'drift_presence' }, (payload) => {
+      log(`PRESENCE: ${payload.eventType} | user=${payload.new?.user_id || payload.old?.user_id} | online=${payload.new?.is_online}`, 'event');
+    })
+    .subscribe((status) => log(`presence channel: ${status}`, 'info'));
+  channels.push(ch);
+  log('Subscribed to drift_presence changes', 'info');
+}
+
+function subSessions() {
+  if (!client) { log('Connect first', 'error'); return; }
+  const ch = client
+    .channel('sessions-test')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'drift_sessions' }, (payload) => {
+      log(`SESSION: ${payload.eventType} | id=${payload.new?.id || payload.old?.id} | status=${payload.new?.status}`, 'event');
+    })
+    .subscribe((status) => log(`sessions channel: ${status}`, 'info'));
+  channels.push(ch);
+  log('Subscribed to drift_sessions changes', 'info');
+}
+
+function subMatches() {
+  if (!client) { log('Connect first', 'error'); return; }
+  const ch = client
+    .channel('match-alice-bob')
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'drift_matches',
+      filter: `id=eq.${ALICE_BOB_MATCH}`
+    }, (payload) => {
+      log(`MATCH: ${payload.eventType} | status=${payload.new?.status}`, 'event');
+    })
+    .subscribe((status) => log(`matches channel: ${status}`, 'info'));
+  channels.push(ch);
+  log('Subscribed to Alice-Bob match changes', 'info');
+}
+
+function subContactExchange() {
+  if (!client) { log('Connect first', 'error'); return; }
+  const ch = client
+    .channel('contact-alice-bob')
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'drift_contact_exchange',
+      filter: `match_id=eq.${ALICE_BOB_MATCH}`
+    }, (payload) => {
+      log(`CONTACT EXCHANGE: ${payload.eventType} | initiator_consented=${payload.new?.initiator_consented} | target_consented=${payload.new?.target_consented}`, 'event');
+    })
+    .subscribe((status) => log(`contact exchange channel: ${status}`, 'info'));
+  channels.push(ch);
+  log('Subscribed to Alice-Bob contact exchange changes', 'info');
+}
+
+function subStories() {
+  if (!client) { log('Connect first', 'error'); return; }
+  const ch = client
+    .channel('stories-test')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'drift_stories' }, (payload) => {
+      log(`STORY: ${payload.eventType} | id=${payload.new?.id || payload.old?.id} | reactions=${payload.new?.reaction_count}`, 'event');
+    })
+    .subscribe((status) => log(`stories channel: ${status}`, 'info'));
+  channels.push(ch);
+  log('Subscribed to drift_stories changes', 'info');
+}
+
+function subNotifications() {
+  if (!client) { log('Connect first', 'error'); return; }
+  const ch = client
+    .channel('notifications-test')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trombl_notifications' }, (payload) => {
+      log(`NOTIFICATION: ${payload.eventType} | type=${payload.new?.type} | title=${payload.new?.title}`, 'event');
+    })
+    .subscribe((status) => log(`notifications channel: ${status}`, 'info'));
+  channels.push(ch);
+  log('Subscribed to trombl_notifications', 'info');
+}
+
+async function heartbeat() {
+  if (!client) { log('Connect first', 'error'); return; }
+  const { error } = await client
+    .from('drift_presence')
+    .upsert({ user_id: ALICE_ID, is_online: true, last_seen_at: new Date().toISOString() });
+  if (error) log(`Heartbeat error: ${error.message}`, 'error');
+  else log('Heartbeat sent — watch drift_presence channel for UPDATE event', 'ok');
+}
+
+async function revertStoryReaction() {
+  if (!client) { log('Connect first', 'error'); return; }
+  reactionToggle = !reactionToggle;
+  if (reactionToggle) {
+    const { error } = await client
+      .from('drift_story_reactions')
+      .insert({ story_id: ALICE_STORY, user_id: BOB_ID, reaction_type: 'spark' });
+    if (error) log(`Reaction insert: ${error.message}`, 'error');
+    else log('Added reaction — watch drift_stories reaction_count change', 'ok');
+  } else {
+    const { error } = await client
+      .from('drift_story_reactions')
+      .delete().eq('story_id', ALICE_STORY).eq('user_id', BOB_ID);
+    if (error) log(`Reaction delete: ${error.message}`, 'error');
+    else log('Removed reaction — watch drift_stories reaction_count change', 'ok');
+  }
+}
+
+function disconnectAll() {
+  channels.forEach(ch => ch.unsubscribe());
+  channels.length = 0;
+  log('All channels unsubscribed', 'info');
+}
+</script>
+</body>
+</html>
