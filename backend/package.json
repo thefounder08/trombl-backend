@@ -1,0 +1,26 @@
+{
+  "name": "trombl-backend",
+  "version": "1.0.0",
+  "description": "Production backend for Trombl — social discovery platform",
+  "private": true,
+  "scripts": {
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:migrate": "supabase db push",
+    "db:seed": "supabase db reset --db-url $DATABASE_URL",
+    "db:diff": "supabase db diff",
+    "db:generate-types": "supabase gen types typescript --local > supabase/types/generated.ts",
+    "functions:serve": "supabase functions serve",
+    "functions:deploy": "supabase functions deploy",
+    "test": "deno test --allow-net --allow-env tests/",
+    "test:rls": "psql $DATABASE_URL -f tests/rls/",
+    "lint": "deno lint supabase/functions/",
+    "format": "deno fmt supabase/functions/",
+    "typecheck": "deno check supabase/functions/**/*.ts"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "supabase": "^1.200.3"
+  }
+}
